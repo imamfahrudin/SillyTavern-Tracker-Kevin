@@ -322,33 +322,50 @@ async function handleStagedGeneration(type, options, dryRun) {
 		position = 0;
 		tracker = lastMes.tracker;
 	} else {
+		debug("handleStagedGeneration: Checking tracker generation conditions", { 
+			mesId, 
+			type,
+			hasCmdTrackerOverride: !!chat_metadata.tracker.cmdTrackerOverride,
+			checkingMesId: mesId + 1
+		});
+
 		if(chat_metadata.tracker.cmdTrackerOverride) {
+			debug("handleStagedGeneration: Using cmdTrackerOverride");
 			tracker = { ...chat_metadata.tracker.cmdTrackerOverride };
 			chat_metadata.tracker.cmdTrackerOverride = null;
 		} else if (shouldUseLastTracker(mesId + 1, type)) {
 			// For impersonate with CHARACTER target, use the last tracker without generating
-			debug("Using last tracker for message:", mesId);
+			debug("✓ handleStagedGeneration: shouldUseLastTracker returned true, using last tracker for message:", mesId);
 			const lastMesWithTrackerIndex = getLastMessageWithTracker(mesId);
+			debug("handleStagedGeneration: Last message with tracker index:", lastMesWithTrackerIndex);
 			if (lastMesWithTrackerIndex !== null) {
 				const lastMesWithTracker = chat[lastMesWithTrackerIndex];
 				tracker = getCleanTracker(lastMesWithTracker.tracker, extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, true, OUTPUT_FORMATS.JSON);
+				debug("handleStagedGeneration: Retrieved and cleaned tracker from message", { lastMesWithTrackerIndex, tracker });
 			} else {
 				tracker = getDefaultTracker(extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, OUTPUT_FORMATS.JSON);
+				debug("handleStagedGeneration: No previous tracker found, using default tracker", { tracker });
 			}
 		} else if (shouldGenerateTracker(mesId + 1, type)) {
-			debug("Generating new tracker for message:", mesId);
+			debug("handleStagedGeneration: shouldGenerateTracker returned true, generating new tracker for message:", mesId);
 			tracker = await generateTracker(mesId);
 		} else if (shouldShowPopup(mesId + 1, type)) {
+			debug("handleStagedGeneration: shouldShowPopup returned true, showing manual tracker popup");
 			const manualTracker = await showManualTrackerPopup(mesId + 1);
 			if (manualTracker) tracker = manualTracker;
+		} else {
+			debug("handleStagedGeneration: No tracker action taken - all conditions returned false");
 		}
 
 		if (tracker) {
+			debug("handleStagedGeneration: Tracker set, saving to metadata", { mesId: mesId + 1, tracker });
 			chat_metadata.tracker.tempTrackerId = mesId + 1;
 			chat_metadata.tracker.tempTracker = tracker;
 			await saveChatConditional();
 
 			position = 0;
+		} else {
+			debug("handleStagedGeneration: No tracker was set");
 		}
 	}
 
