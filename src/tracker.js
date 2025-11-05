@@ -2,7 +2,7 @@ import { saveChatConditional, chat, chat_metadata, setExtensionPrompt, extension
 
 import { hasPendingFileAttachment } from "../../../../../scripts/chats.js";
 import { getMessageTimeStamp } from "../../../../../scripts/RossAscends-mods.js";
-import { debug, getLastMessageWithTracker, getLastNonSystemMessageIndex, getNextNonSystemMessageIndex, getPreviousNonSystemMessageIndex, isSystemMessage, shouldGenerateTracker, shouldShowPopup, warn } from "../lib/utils.js";
+import { debug, getLastMessageWithTracker, getLastNonSystemMessageIndex, getNextNonSystemMessageIndex, getPreviousNonSystemMessageIndex, isSystemMessage, shouldGenerateTracker, shouldUseLastTracker, shouldShowPopup, warn } from "../lib/utils.js";
 import { extensionSettings } from "../index.js";
 import { generateTracker, getRequestPrompt } from "./generation.js";
 import { generationModes, generationTargets } from "./settings/settings.js";
@@ -325,6 +325,16 @@ async function handleStagedGeneration(type, options, dryRun) {
 		if(chat_metadata.tracker.cmdTrackerOverride) {
 			tracker = { ...chat_metadata.tracker.cmdTrackerOverride };
 			chat_metadata.tracker.cmdTrackerOverride = null;
+		} else if (shouldUseLastTracker(mesId + 1, type)) {
+			// For impersonate with CHARACTER target, use the last tracker without generating
+			debug("Using last tracker for message:", mesId);
+			const lastMesWithTrackerIndex = getLastMessageWithTracker(mesId);
+			if (lastMesWithTrackerIndex !== null) {
+				const lastMesWithTracker = chat[lastMesWithTrackerIndex];
+				tracker = getCleanTracker(lastMesWithTracker.tracker, extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, true, OUTPUT_FORMATS.JSON);
+			} else {
+				tracker = getDefaultTracker(extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, OUTPUT_FORMATS.JSON);
+			}
 		} else if (shouldGenerateTracker(mesId + 1, type)) {
 			debug("Generating new tracker for message:", mesId);
 			tracker = await generateTracker(mesId);
@@ -343,13 +353,13 @@ async function handleStagedGeneration(type, options, dryRun) {
 	}
 
 	if (!tracker) {
-		const lastMesWithTrackerIndex = getLastMessageWithTracker(chat, mesId);
+		const lastMesWithTrackerIndex = getLastMessageWithTracker(mesId);
 
 		if (lastMesWithTrackerIndex !== null) {
 			const lastMesWithTracker = chat[lastMesWithTrackerIndex];
 
 			tracker = getCleanTracker(lastMesWithTracker.tracker, extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, true, OUTPUT_FORMATS.JSON);
-			position = lastMesReverseIndex;
+			position = chat.length - 1 - lastMesWithTrackerIndex;
 		} else {
 			tracker = "";
 			position = 0;
