@@ -486,9 +486,27 @@ export async function addTrackerToMessage(mesId) {
 			const trackerMesId = isSystemMessage(tempId) ? getNextNonSystemMessageIndex(tempId) : tempId;
 			const tracker = chat_metadata.tracker.tempTracker;
 			debug("✓ addTrackerToMessage: Computed trackerMesId:", { trackerMesId, mesId, match: trackerMesId === mesId });
+			
+			// Check if this message matches the expected ID AND the target type
 			if (trackerMesId === mesId) {
-				debug("✓ addTrackerToMessage: Match found! Adding tracker to message", { mesId, isUser: chat[mesId]?.is_user });
-				await saveTrackerToMessage(mesId, tracker);
+				const isUserMessage = chat[mesId]?.is_user;
+				const shouldAddToThisMessage = 
+					(extensionSettings.generationTarget === generationTargets.CHARACTER && !isUserMessage) ||
+					(extensionSettings.generationTarget === generationTargets.USER && isUserMessage) ||
+					(extensionSettings.generationTarget === generationTargets.BOTH);
+				
+				debug("✓ addTrackerToMessage: Target check", { 
+					target: extensionSettings.generationTarget, 
+					isUserMessage, 
+					shouldAddToThisMessage 
+				});
+				
+				if (shouldAddToThisMessage) {
+					debug("✓ addTrackerToMessage: Match found! Adding tracker to message", { mesId, isUser: chat[mesId]?.is_user });
+					await saveTrackerToMessage(mesId, tracker);
+				} else {
+					debug("✓ addTrackerToMessage: Target mismatch, skipping", { mesId, isUserMessage, target: extensionSettings.generationTarget });
+				}
 			} else {
 				debug("✓ addTrackerToMessage: No match, skipping", { trackerMesId, mesId });
 			}
