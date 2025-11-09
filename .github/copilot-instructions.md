@@ -85,6 +85,18 @@ const newSettings = {
 2. **Test Integration:** Use generation mutex events to coordinate with other extensions
 3. **Validate Settings:** Always check `await isEnabled()` before operations
 4. **Handle Migration:** Update settings initialization when adding new config options
+5. **Run Tests:** Execute `npm test` to run unit tests and validate functionality
+6. **Review Changes:** After implementing changes, ask if the user is satisfied with the modifications
+7. **Commit Changes:** If satisfied, provide a commit message following conventional commit format starting with `<type>:` (e.g., `feat:`, `fix:`, `docs:`, etc.) describing the changes made
+
+## Testing
+
+The project includes comprehensive unit tests for core utilities:
+
+- **Test Location:** Located in `test/` directory
+- **Test Coverage:** YAML/JSON conversion, edge cases, round-trip validation, and other utilities
+- **Running Tests:** Use `npm test` from the project root
+- **Test Organization:** Tests are separated in the `test/` directory for clean project structure
 
 ## Common Integration Points
 
@@ -96,7 +108,8 @@ const newSettings = {
 ## File Organization
 
 - `src/` - Core business logic
-- `lib/` - Shared utilities and cross-cutting concerns
+- `lib/` - Shared utilities and cross-cutting concerns (YAML parser, interconnection, utils)
+- `test/` - Unit tests and test documentation
 - `ui/` - Interface components and rendering
 - `settings/` - Configuration management
 - `html/` - UI templates and settings panels
@@ -109,6 +122,7 @@ const newSettings = {
 - `src/settings/settings.js` - Configuration management
 - `lib/utils.js` - Logging and utility functions
 - `lib/interconnection.js` - Extension coordination patterns
+- `lib/ymlParser.js` - YAML to JSON and JSON to YAML conversion utilities
 
 ## Advanced Patterns
 
