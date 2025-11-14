@@ -526,6 +526,7 @@ export const defaultSettings = {
 	messageSummarizationRecentMessagesTemplate: "",
 
 	inlineRequestPrompt: "",
+	assistantPrefill: "",
 
 	characterDescriptionTemplate: characterDescriptionTemplate,
 
@@ -556,6 +557,7 @@ export const defaultSettings = {
 			messageSummarizationRecentMessagesTemplate: "",
 
 			inlineRequestPrompt: "",
+			assistantPrefill: "",
 
 			characterDescriptionTemplate: characterDescriptionTemplate,
 

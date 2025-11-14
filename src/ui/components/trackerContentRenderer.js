@@ -218,39 +218,43 @@ export class TrackerContentRenderer {
 						const listContainer = document.createElement("div");
 						listContainer.className = "tracker-editor-list";
 
-						arrayValue.forEach((itemValue, index) => {
-							const itemWrapper = document.createElement("div");
-							itemWrapper.className = "tracker-editor-list-item";
+						const populateListContainer = () => {
+							listContainer.innerHTML = '';
+							arrayValue.forEach((itemValue, idx) => {
+								const itemWrapper = document.createElement("div");
+								itemWrapper.className = "tracker-editor-list-item";
 
-							const textarea = createAutoResizingTextarea(itemValue, (newVal) => {
-								arrayValue[index] = newVal;
-								onUpdate(tracker);
+								const textarea = createAutoResizingTextarea(itemValue, (newVal) => {
+									arrayValue[idx] = newVal;
+									onUpdate(tracker);
+								});
+								itemWrapper.appendChild(textarea);
+
+								const removeButton = document.createElement("button");
+								removeButton.className = "menu_button interactable";
+								removeButton.textContent = "Remove";
+								removeButton.addEventListener("click", () => {
+									arrayValue.splice(idx, 1);
+									onUpdate(tracker);
+									populateListContainer();
+								});
+								itemWrapper.appendChild(removeButton);
+
+								listContainer.appendChild(itemWrapper);
 							});
-							itemWrapper.appendChild(textarea);
 
-							const removeButton = document.createElement("button");
-							removeButton.className = "menu_button interactable";
-							removeButton.textContent = "Remove";
-							removeButton.addEventListener("click", () => {
-								arrayValue.splice(index, 1);
+							const addButton = document.createElement("button");
+							addButton.className = "menu_button interactable";
+							addButton.textContent = "Add Item";
+							addButton.addEventListener("click", () => {
+								arrayValue.push("");
 								onUpdate(tracker);
-								root.replaceWith(this.renderEditorView(tracker, onUpdate));
+								populateListContainer();
 							});
-							itemWrapper.appendChild(removeButton);
+							listContainer.appendChild(addButton);
+						};
 
-							listContainer.appendChild(itemWrapper);
-						});
-
-						const addButton = document.createElement("button");
-						addButton.className = "menu_button interactable";
-						addButton.textContent = "Add Item";
-						addButton.addEventListener("click", () => {
-							arrayValue.push("");
-							onUpdate(tracker);
-							root.replaceWith(this.renderEditorView(tracker, onUpdate));
-						});
-						listContainer.appendChild(addButton);
-
+						populateListContainer();
 						wrapper.appendChild(listContainer);
 						break;
 					}
@@ -434,6 +438,8 @@ export class TrackerContentRenderer {
 							const arrayContainer = document.createElement("div");
 							arrayContainer.className = "tracker-editor-nested";
 
+						const populateArrayContainer = () => {
+							arrayContainer.innerHTML = '';
 							arrayValue.forEach((arrItem, arrIndex) => {
 								const arrItemWrapper = document.createElement("div");
 								arrItemWrapper.className = "tracker-editor-field";
@@ -444,14 +450,12 @@ export class TrackerContentRenderer {
 								arrItemWrapper.appendChild(arrItemLabel);
 
 								if (singleStringField) {
-									// Just a textarea for a single string
 									const textarea = createAutoResizingTextarea(arrItem, (newVal) => {
 										arrayValue[arrIndex] = newVal;
 										onUpdate(tracker);
 									});
 									arrItemWrapper.appendChild(textarea);
 								} else {
-									// Multiple fields (array of objects)
 									if (typeof arrItem !== "object" || arrItem === null) {
 										arrItem = createDefaultArrayItem();
 										arrayValue[arrIndex] = arrItem;
@@ -468,7 +472,7 @@ export class TrackerContentRenderer {
 								removeItemButton.addEventListener("click", () => {
 									arrayValue.splice(arrIndex, 1);
 									onUpdate(tracker);
-									root.replaceWith(this.renderEditorView(tracker, onUpdate));
+									populateArrayContainer();
 								});
 								arrItemWrapper.appendChild(removeItemButton);
 
@@ -481,11 +485,12 @@ export class TrackerContentRenderer {
 							addItemButton.addEventListener("click", () => {
 								arrayValue.push(createDefaultArrayItem());
 								onUpdate(tracker);
-								root.replaceWith(this.renderEditorView(tracker, onUpdate));
+								populateArrayContainer();
 							});
 							arrayContainer.appendChild(addItemButton);
+						};
 
-							itemWrapper.appendChild(arrayContainer);
+						populateArrayContainer();							itemWrapper.appendChild(arrayContainer);
 							nestedFields.appendChild(itemWrapper);
 						});
 
@@ -501,7 +506,85 @@ export class TrackerContentRenderer {
 								} else {
 									objectValue[newKey] = [];
 									onUpdate(tracker);
-									root.replaceWith(this.renderEditorView(tracker, onUpdate));
+									// Add the new itemWrapper
+							const arrayValue = objectValue[newKey];
+							const itemWrapper = document.createElement("div");
+							itemWrapper.className = "tracker-editor-field";
+
+							const keyLabel = document.createElement("label");
+							keyLabel.className = "tracker-editor-label";
+							keyLabel.textContent = `${newKey}: `;
+							itemWrapper.appendChild(keyLabel);
+
+							const removeKeyButton = document.createElement("button");
+							removeKeyButton.className = "menu_button interactable";
+							removeKeyButton.textContent = "Remove Key";
+							removeKeyButton.addEventListener("click", () => {
+								delete objectValue[newKey];
+								onUpdate(tracker);
+								itemWrapper.remove();
+							});
+							itemWrapper.appendChild(removeKeyButton);
+
+							const arrayContainer = document.createElement("div");
+							arrayContainer.className = "tracker-editor-nested";
+
+							const populateArrayContainer = () => {
+								arrayContainer.innerHTML = '';
+								arrayValue.forEach((arrItem, arrIndex) => {
+									const arrItemWrapper = document.createElement("div");
+									arrItemWrapper.className = "tracker-editor-field";
+
+									const arrItemLabel = document.createElement("span");
+									arrItemLabel.className = "tracker-editor-label";
+									arrItemLabel.textContent = `[${arrIndex}]: `;
+									arrItemWrapper.appendChild(arrItemLabel);
+
+									if (singleStringField) {
+										const textarea = createAutoResizingTextarea(arrItem, (newVal) => {
+											arrayValue[arrIndex] = newVal;
+											onUpdate(tracker);
+										});
+										arrItemWrapper.appendChild(textarea);
+									} else {
+										if (typeof arrItem !== "object" || arrItem === null) {
+											arrItem = createDefaultArrayItem();
+											arrayValue[arrIndex] = arrItem;
+										}
+										const arrItemFields = document.createElement("div");
+										arrItemFields.className = "tracker-editor-nested";
+										createEditorFields(arrItem, fieldSchema.nestedFields, arrItemFields);
+										arrItemWrapper.appendChild(arrItemFields);
+									}
+
+									const removeItemButton = document.createElement("button");
+									removeItemButton.className = "menu_button interactable";
+									removeItemButton.textContent = "Remove Item";
+									removeItemButton.addEventListener("click", () => {
+										arrayValue.splice(arrIndex, 1);
+										onUpdate(tracker);
+										populateArrayContainer();
+									});
+									arrItemWrapper.appendChild(removeItemButton);
+
+									arrayContainer.appendChild(arrItemWrapper);
+								});
+
+								const addItemButton = document.createElement("button");
+								addItemButton.className = "menu_button interactable";
+								addItemButton.textContent = "Add Item";
+								addItemButton.addEventListener("click", () => {
+									arrayValue.push(createDefaultArrayItem());
+									onUpdate(tracker);
+									populateArrayContainer();
+								});
+								arrayContainer.appendChild(addItemButton);
+							};
+
+							populateArrayContainer();
+							itemWrapper.appendChild(arrayContainer);
+
+							nestedFields.insertBefore(itemWrapper, addKeyButton);
 								}
 							}
 						});

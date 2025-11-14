@@ -1,0 +1,10 @@
+{
+  "name": "sillytavern-tracker",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test/ymlParser.test.js"
+  },
+  "description": "SillyTavern Tracker Extension",
+  "main": "index.js"
+}

@@ -127,12 +127,13 @@ async function generateSingleStageTracker(mesNum, includedFields, firstStageMess
 	// Build system and request prompts
 	const systemPrompt = getGenerateSystemPrompt(mesNum, includedFields, firstStageMessage);
 	const requestPrompt = getRequestPrompt(extensionSettings.generateRequestPrompt, mesNum, includedFields, firstStageMessage);
+	const assistantPrefill = getAssistantPrefill(includedFields);
 
 	let responseLength = extensionSettings.responseLength > 0 ? extensionSettings.responseLength : null;
 
 	// Generate tracker using the AI model
-	log("Generating tracker with prompts:", { systemPrompt, requestPrompt, responseLength, mesNum });
-	const tracker = await sendGenerateTrackerRequest(systemPrompt, requestPrompt, responseLength);
+	log("Generating tracker with prompts:", { systemPrompt, requestPrompt, assistantPrefill, responseLength, mesNum });
+	const tracker = await sendGenerateTrackerRequest(systemPrompt, requestPrompt, responseLength, assistantPrefill);
 
 	return tracker;
 }
@@ -152,7 +153,7 @@ async function generateTwoStageTracker(mesNum, includedFields) {
 	let responseLength = extensionSettings.responseLength > 0 ? extensionSettings.responseLength : null;
 
 	// Run the summarization stage to get the firstStageMessage
-	const message = await generateRaw(requestPrompt, null, false, false, systemPrompt, responseLength);
+	const message = await generateRaw({ prompt: requestPrompt, instructOverride: false, quietToLoud: false, systemPrompt, responseLength });
 	debug("Message Summarized:", { message });
 
 	// Generate tracker using the AI model in single-stage manner but with the first stage message
@@ -166,9 +167,10 @@ async function generateTwoStageTracker(mesNum, includedFields) {
  * @param {string} systemPrompt
  * @param {string} requestPrompt
  * @param {number|null} responseLength
+ * @param {string} assistantPrefill
  */
-async function sendGenerateTrackerRequest(systemPrompt, requestPrompt, responseLength) {
-	let tracker = await generateRaw(requestPrompt, null, false, false, systemPrompt, responseLength);
+async function sendGenerateTrackerRequest(systemPrompt, requestPrompt, responseLength, assistantPrefill = '') {
+	let tracker = await generateRaw({ prompt: requestPrompt, instructOverride: false, quietToLoud: false, systemPrompt, responseLength, prefill: assistantPrefill });
 	debug("Generated tracker:", { tracker });
 
 	let newTracker;
@@ -428,6 +430,28 @@ export function getRequestPrompt(template, mesNum = null, includedFields, firstS
 	if (extensionSettings.generationMode === generationModes.TWO_STAGE && firstStage && template.includes("{{firstStageMessage}}")) {
 		vars.firstStageMessage = firstStage;
 	}
+
+	return formatTemplate(template, vars);
+}
+
+/**
+ * Retrieves the assistant prefill text. {{trackerFieldPrompt}}, {{trackerFormat}}
+ * @param {string} includedFields
+ * @returns {string} The assistant prefill text, or empty string if not set.
+ */
+function getAssistantPrefill(includedFields) {
+	const template = extensionSettings.assistantPrefill;
+	
+	// If template is empty or undefined, return empty string
+	if (!template || template.trim() === '') {
+		return '';
+	}
+
+	const trackerFieldPromptVal = getTrackerPrompt(extensionSettings.trackerDef, includedFields);
+	const vars = {
+		trackerFieldPrompt: trackerFieldPromptVal,
+		trackerFormat: extensionSettings.trackerFormat,
+	};
 
 	return formatTemplate(template, vars);
 }

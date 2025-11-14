@@ -2,7 +2,7 @@ import { saveChatConditional, chat, chat_metadata, setExtensionPrompt, extension
 
 import { hasPendingFileAttachment } from "../../../../../scripts/chats.js";
 import { getMessageTimeStamp } from "../../../../../scripts/RossAscends-mods.js";
-import { debug, getLastMessageWithTracker, getLastNonSystemMessageIndex, getNextNonSystemMessageIndex, getPreviousNonSystemMessageIndex, isSystemMessage, shouldGenerateTracker, shouldShowPopup, warn } from "../lib/utils.js";
+import { debug, getLastMessageWithTracker, getLastNonSystemMessageIndex, getNextNonSystemMessageIndex, getPreviousNonSystemMessageIndex, isSystemMessage, shouldGenerateTracker, shouldUseLastTracker, shouldShowPopup, warn } from "../lib/utils.js";
 import { extensionSettings } from "../index.js";
 import { generateTracker, getRequestPrompt } from "./generation.js";
 import { generationModes, generationTargets } from "./settings/settings.js";
@@ -194,11 +194,14 @@ async function refreshInlineTrackers(lastMesId, noSave = false) {
  * @param {boolean} dryRun - If true, the function will simulate the operation without side effects.
  */
 export async function prepareMessageGeneration(type, options, dryRun) {
+	debug("prepareMessageGeneration called", { type, options, dryRun, generationMode: extensionSettings.generationMode });
 	if (!chat_metadata.tracker) chat_metadata.tracker = {};
 
 	if (extensionSettings.generationMode === generationModes.INLINE) {
+		debug("prepareMessageGeneration: Using INLINE mode");
 		await handleInlineGeneration(type);
 	} else {
+		debug("prepareMessageGeneration: Using STAGED mode");
 		await handleStagedGeneration(type, options, dryRun);
 	}
 }
@@ -273,6 +276,7 @@ async function handleInlineGeneration(type) {
  * @param {boolean} dryRun - If true, the function will simulate the operation without side effects.
  */
 async function handleStagedGeneration(type, options, dryRun) {
+	debug("handleStagedGeneration started", { type, options, dryRun });
 	const manageStopButton = $("#mes_stop").css("display") === "none";
 	if (manageStopButton) deactivateSendButtons();
 
@@ -322,34 +326,61 @@ async function handleStagedGeneration(type, options, dryRun) {
 		position = 0;
 		tracker = lastMes.tracker;
 	} else {
+		debug("handleStagedGeneration: Checking tracker generation conditions", { 
+			mesId, 
+			type,
+			hasCmdTrackerOverride: !!chat_metadata.tracker.cmdTrackerOverride,
+			checkingMesId: mesId + 1
+		});
+
 		if(chat_metadata.tracker.cmdTrackerOverride) {
+			debug("handleStagedGeneration: Using cmdTrackerOverride");
 			tracker = { ...chat_metadata.tracker.cmdTrackerOverride };
 			chat_metadata.tracker.cmdTrackerOverride = null;
+		} else if (shouldUseLastTracker(mesId + 1, type)) {
+			// For impersonate with CHARACTER target, use the last tracker without generating
+			debug("✓ handleStagedGeneration: shouldUseLastTracker returned true, using last tracker for message:", mesId);
+			const lastMesWithTrackerIndex = getLastMessageWithTracker(mesId);
+			debug("handleStagedGeneration: Last message with tracker index:", lastMesWithTrackerIndex);
+			if (lastMesWithTrackerIndex !== null) {
+				const lastMesWithTracker = chat[lastMesWithTrackerIndex];
+				tracker = getCleanTracker(lastMesWithTracker.tracker, extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, true, OUTPUT_FORMATS.JSON);
+				debug("handleStagedGeneration: Retrieved and cleaned tracker from message", { lastMesWithTrackerIndex, tracker });
+			} else {
+				tracker = getDefaultTracker(extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, OUTPUT_FORMATS.JSON);
+				debug("handleStagedGeneration: No previous tracker found, using default tracker", { tracker });
+			}
 		} else if (shouldGenerateTracker(mesId + 1, type)) {
-			debug("Generating new tracker for message:", mesId);
+			debug("handleStagedGeneration: shouldGenerateTracker returned true, generating new tracker for message:", mesId);
 			tracker = await generateTracker(mesId);
 		} else if (shouldShowPopup(mesId + 1, type)) {
+			debug("handleStagedGeneration: shouldShowPopup returned true, showing manual tracker popup");
 			const manualTracker = await showManualTrackerPopup(mesId + 1);
 			if (manualTracker) tracker = manualTracker;
+		} else {
+			debug("handleStagedGeneration: No tracker action taken - all conditions returned false");
 		}
 
 		if (tracker) {
+			debug("handleStagedGeneration: Tracker set, saving to metadata", { mesId: mesId + 1, tracker });
 			chat_metadata.tracker.tempTrackerId = mesId + 1;
 			chat_metadata.tracker.tempTracker = tracker;
 			await saveChatConditional();
 
 			position = 0;
+		} else {
+			debug("handleStagedGeneration: No tracker was set");
 		}
 	}
 
 	if (!tracker) {
-		const lastMesWithTrackerIndex = getLastMessageWithTracker(chat, mesId);
+		const lastMesWithTrackerIndex = getLastMessageWithTracker(mesId);
 
 		if (lastMesWithTrackerIndex !== null) {
 			const lastMesWithTracker = chat[lastMesWithTrackerIndex];
 
 			tracker = getCleanTracker(lastMesWithTracker.tracker, extensionSettings.trackerDef, FIELD_INCLUDE_OPTIONS.ALL, true, OUTPUT_FORMATS.JSON);
-			position = lastMesReverseIndex;
+			position = chat.length - 1 - lastMesWithTrackerIndex;
 		} else {
 			tracker = "";
 			position = 0;
@@ -448,13 +479,36 @@ export async function addTrackerToMessage(mesId) {
 		if(isSystemMessage(mesId)) return;
 		const tempId = chat_metadata?.tracker?.tempTrackerId ?? null;
 		if(chat_metadata?.tracker?.cmdTrackerOverride) {
+			debug("✓ addTrackerToMessage: Using cmdTrackerOverride for mesId:", mesId);
 			saveTrackerToMessage(mesId, chat_metadata.tracker.cmdTrackerOverride);
 		} else if (tempId != null) {
-			debug("Checking for temp tracker match", { mesId, tempId });
+			debug("✓ addTrackerToMessage: Checking for temp tracker match", { mesId, tempId, isUser: chat[mesId]?.is_user, messageText: chat[mesId]?.mes?.substring(0, 50) });
 			const trackerMesId = isSystemMessage(tempId) ? getNextNonSystemMessageIndex(tempId) : tempId;
 			const tracker = chat_metadata.tracker.tempTracker;
+			debug("✓ addTrackerToMessage: Computed trackerMesId:", { trackerMesId, mesId, match: trackerMesId === mesId });
+			
+			// Check if this message matches the expected ID AND the target type
 			if (trackerMesId === mesId) {
-				await saveTrackerToMessage(mesId, tracker);
+				const isUserMessage = chat[mesId]?.is_user;
+				const shouldAddToThisMessage = 
+					(extensionSettings.generationTarget === generationTargets.CHARACTER && !isUserMessage) ||
+					(extensionSettings.generationTarget === generationTargets.USER && isUserMessage) ||
+					(extensionSettings.generationTarget === generationTargets.BOTH);
+				
+				debug("✓ addTrackerToMessage: Target check", { 
+					target: extensionSettings.generationTarget, 
+					isUserMessage, 
+					shouldAddToThisMessage 
+				});
+				
+				if (shouldAddToThisMessage) {
+					debug("✓ addTrackerToMessage: Match found! Adding tracker to message", { mesId, isUser: chat[mesId]?.is_user });
+					await saveTrackerToMessage(mesId, tracker);
+				} else {
+					debug("✓ addTrackerToMessage: Target mismatch, skipping", { mesId, isUserMessage, target: extensionSettings.generationTarget });
+				}
+			} else {
+				debug("✓ addTrackerToMessage: No match, skipping", { trackerMesId, mesId });
 			}
 		} else {
 			const previousMesId = getPreviousNonSystemMessageIndex(mesId);

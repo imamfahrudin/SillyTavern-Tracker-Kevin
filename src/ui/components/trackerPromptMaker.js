@@ -182,7 +182,7 @@ export class TrackerPromptMaker {
 			}
 		}
 
-		const fieldWrapper = $('<div class="field-wrapper"></div>').attr("data-field-id", fieldId);
+		const fieldWrapper = $('<div class="field-wrapper collapsed"></div>').attr("data-field-id", fieldId);
 
 		// Combined div for Field Name, Static/Dynamic Toggle, and Field Type Selector
 		const nameDynamicTypeDiv = $('<div class="name-dynamic-type-wrapper"></div>');
@@ -190,6 +190,16 @@ export class TrackerPromptMaker {
 		// Drag Handle
 		const dragHandle = $('<span class="drag-handle">&#x2630;</span>'); // Unicode for hamburger icon
 		nameDynamicTypeDiv.append(dragHandle);
+
+		// Collapse/Expand Toggle Button
+		const toggleButton = $('<button class="collapse-toggle-btn" title="Toggle field details">▶</button>')
+			.on("click", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				fieldWrapper.toggleClass("collapsed");
+				toggleButton.text(fieldWrapper.hasClass("collapsed") ? "▶" : "▼");
+			});
+		nameDynamicTypeDiv.append(toggleButton);
 
 		// Field Name Input with label
 		const fieldNameLabel = $("<label>Field Name:</label>");

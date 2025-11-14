@@ -129,6 +129,14 @@
 						><br />
 						<textarea id="tracker_request_prompt" class="text_pole" rows="5"></textarea>
 					</div>
+					<div id="assistant_prefill_section" class="tracker-block m-b-1 m-t-1">
+						<label for="tracker_assistant_prefill">Assistant Prefill</label><br />
+						<small
+							>Text to prefill as the assistant's response at the end of the prompt. This will be inserted as an 'assistant' role message. Leave empty to disable prefill.<br />
+							Available macros: {{trackerFieldPrompt}}, {{trackerFormat}}.</small
+						><br />
+						<textarea id="tracker_assistant_prefill" class="text_pole" rows="3"></textarea>
+					</div>
 					<div class="tracker-block m-b-1 m-t-1">
 						<label for="tracker_recent_messages">Recent Messages Template</label><br />
 						<small
